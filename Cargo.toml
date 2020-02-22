@@ -1,0 +1,25 @@
+[package]
+name = "sso_auth"
+version = "0.1.0"
+authors = ["lcdr"]
+edition = "2018"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/lcdr/sso_auth/"
+
+[features]
+default = ["tls"]
+
+tls = ["rustls", "webpki", "webpki-roots"]
+
+[dependencies]
+libsqlite3-sys = { version = "0.9.1", features = ["bundled"] }
+diesel = { version = "1.4.3", features = ["sqlite"] }
+rand = "0.7.3"
+bcrypt = "0.6"
+toml = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+rustls = { version = "0.14.0", optional = true }
+webpki = { version = "0.18.1", optional = true }
+webpki-roots = { version = "0.15.0", optional = true }
+endio = "0.1.0"
+lu_packets = { git = "https://github.com/lcdr/lu_packets" }
