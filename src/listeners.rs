@@ -1,15 +1,15 @@
 //! Message listeners responsible for the behavior of the server in response to incoming messages.
-use std::net::{IpAddr, Ipv4Addr};
-
 use diesel::prelude::*;
-use lu_packets::{
-	common::ServiceId,
-	auth_client::{LoginResponse, Message as OutMessage, Handshake as OutHandshake},
-	auth_server::{ConnectionRequest, InternalPing, LoginRequest, Message as IncMessage, Handshake as IncHandshake},
+use lu_packets::auth::{
+	client::{LoginResponse, Message as OutMessage},
+	server::{LoginRequest, Message as IncMessage},
 };
+use lu_packets::common::ServiceId;
 
+use base_server::listeners::{on_conn_req, on_handshake, on_internal_ping};
+
+use base_server::server::Context as C;
 use crate::models::User;
-use crate::auth::Context as C;
 type Context = C<IncMessage, OutMessage>;
 
 /// Keeps track of the DB connection.
@@ -27,18 +27,20 @@ impl MsgCallback {
 
 	/// Dispatches to the various handlers depending on message type.
 	pub fn on_msg(&self, msg: &IncMessage, ctx: &mut Context) {
-		use lu_packets::auth_server::{
-			Message::{InternalPing, ConnectionRequest, UserMessage},
+		use lu_packets::auth::server::{
+			Message::{InternalPing, ConnectionRequest, NewIncomingConnection, UserMessage},
 			LUMessage::{General, Auth},
 			GeneralMessage::Handshake,
 			AuthMessage::LoginRequest,
 		};
-
+		dbg!(&msg);
 		match msg {
 			InternalPing(msg)                    => on_internal_ping(msg, ctx),
 			ConnectionRequest(msg)               => on_conn_req(msg, ctx),
-			UserMessage(General(Handshake(msg))) => on_handshake(msg, ctx),
+			NewIncomingConnection(msg)           => { dbg!(msg); },
+			UserMessage(General(Handshake(msg))) => on_handshake(msg, ctx, ServiceId::Auth),
 			UserMessage(Auth(LoginRequest(msg))) => self.on_login_req(msg, ctx),
+			_ => { println!("Unrecognized packet: {:?}", msg); },
 		}
 	}
 
@@ -80,65 +82,4 @@ impl MsgCallback {
 		};
 		ctx.send(message).unwrap();
 	}
-}
-
-/// Sends back a pong with the same timestamp.
-fn on_internal_ping(ping: &InternalPing, ctx: &mut Context) {
-	ctx.send(OutMessage::ConnectedPong { ping_send_time: ping.send_time }).unwrap();
-}
-
-/// Helper function to convert IPv6 addresses to equivalent IPv4 addresses if possible, or panic otherwise.
-fn get_ipv4(ip: IpAddr) -> Ipv4Addr {
-	match ip {
-		IpAddr::V4(ip) => ip,
-		IpAddr::V6(ip) => {
-			if ip.is_loopback() {
-				Ipv4Addr::LOCALHOST
-			} else {
-				panic!();
-			}
-		}
-	}
-}
-
-/// Sends back a connection request accepted message with local address and remote address.
-fn on_conn_req(conn_req: &ConnectionRequest, ctx: &mut Context) {
-	if *conn_req.password != b"3.25 ND1"[..] {
-		ctx.close_conn();
-		return;
-	};
-	let peer_addr = ctx.peer_addr().unwrap();
-	let peer_ip = get_ipv4(peer_addr.ip());
-	let local_addr = ctx.local_addr().unwrap();
-	let local_ip = get_ipv4(local_addr.ip());
-	let message = OutMessage::ConnectionRequestAccepted {
-		peer_ip,
-		peer_port: peer_addr.port(),
-		local_ip,
-		local_port: local_addr.port()
-	};
-	ctx.send(message).unwrap();
-}
-
-/**
-	Checks for network version and service ID, closing the connection if either doesn't match, otherwise sends back our own network version and service ID.
-*/
-fn on_handshake(inc_handshake: &IncHandshake, ctx: &mut Context) {
-	const NETWORK_VERSION: u32 = 171022;
-
-	if inc_handshake.network_version != NETWORK_VERSION {
-		println!("wrong network version {}", inc_handshake.network_version);
-		ctx.close_conn();
-		return;
-	}
-	if inc_handshake.service_id != ServiceId::Client {
-		println!("wrong service id {:?}", inc_handshake.service_id);
-		ctx.close_conn();
-		return;
-	}
-	let message = OutHandshake {
-		network_version: NETWORK_VERSION,
-		service_id: ServiceId::Auth,
-	};
-	ctx.send(message).unwrap();
 }

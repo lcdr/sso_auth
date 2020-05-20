@@ -17,6 +17,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
 
 [[package]]
+name = "base_server"
+version = "0.1.0"
+source = "git+https://github.com/lcdr/base_server?rev=ceab34fa72eec611f728732dbe0d7fc181d98bc8#ceab34fa72eec611f728732dbe0d7fc181d98bc8"
+dependencies = [
+ "endio",
+ "lu_packets",
+ "rustls",
+ "serde",
+ "toml",
+ "webpki",
+ "webpki-roots",
+]
+
+[[package]]
 name = "bcrypt"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -159,7 +173,7 @@ dependencies = [
 [[package]]
 name = "lu_packets"
 version = "0.1.0"
-source = "git+https://github.com/lcdr/lu_packets#13fd4f830d13fa817b540156d3ba25fb205d81e5"
+source = "git+https://github.com/lcdr/lu_packets?rev=b899ce7bcf59a7445a33bd4ad4e66b0869321c86#b899ce7bcf59a7445a33bd4ad4e66b0869321c86"
 dependencies = [
  "endio",
 ]
@@ -307,6 +321,7 @@ dependencies = [
 name = "sso_auth"
 version = "0.1.0"
 dependencies = [
+ "base_server",
  "bcrypt",
  "diesel",
  "endio",

@@ -19,8 +19,10 @@ use std::net::{TcpListener, TcpStream};
 use diesel::prelude::*;
 use diesel::dsl::{exists, select};
 
+use base_server::TlsConfig;
+
 /// Run the verification server on 0.0.0.0:21835 using the provided database path and TLS config.
-pub fn run(db_path: &str, config: crate::TlsConfig) {
+pub fn run(db_path: &str, config: TlsConfig) {
 	let conn = SqliteConnection::establish(db_path).unwrap();
 	let listener = TcpListener::bind("0.0.0.0:21835").unwrap();
 
@@ -30,9 +32,9 @@ pub fn run(db_path: &str, config: crate::TlsConfig) {
 }
 
 /// Handles a request and writes a response.
-fn handle(stream: Result<TcpStream>, conn: &SqliteConnection, config: &crate::TlsConfig) -> Result<()> {
+fn handle(stream: Result<TcpStream>, conn: &SqliteConnection, config: &TlsConfig) -> Result<()> {
 	#[cfg(feature="tls")]
-	let mut stream = crate::tls::Transport::from(stream?, config)?;
+	let mut stream = base_server::tls::Transport::from(stream?, config)?;
 	#[cfg(not(feature="tls"))]
 	let _ = config;
 	#[cfg(not(feature="tls"))]

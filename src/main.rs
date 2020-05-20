@@ -64,73 +64,21 @@ mod auth;
 mod listeners;
 mod models;
 mod schema;
-mod tcpudp;
 mod verify;
-#[cfg(feature="tls")] mod tls;
 
-#[cfg(feature="tls")] use std::sync::Arc;
+use base_server::{create_tls_config, load_config};
 use std::thread;
-
-#[cfg(feature="tls")]      type TlsConfig = Arc<rustls::ServerConfig>;
-#[cfg(not(feature="tls"))] type TlsConfig = ();
-
-use serde::Deserialize;
-
-#[derive(Deserialize)]
-struct Config {
-	db: DbConf,
-	tls: TlsConf,
-}
-
-#[derive(Deserialize)]
-struct DbConf {
-	path: String,
-}
-
-#[derive(Deserialize)]
-struct TlsConf {
-	#[cfg(feature="tls")]
-	cert_path: String,
-	#[cfg(feature="tls")]
-	key_path: String,
-}
-
-#[cfg(feature="tls")]
-fn create_config(conf: TlsConf) -> TlsConfig {
-	let mut config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
-
-	let certfile = std::fs::File::open(conf.cert_path).expect("cannot open certificate file");
-	let mut reader = std::io::BufReader::new(certfile);
-	let certs = rustls::internal::pemfile::certs(&mut reader).unwrap();
-
-	let keyfile = std::fs::File::open(conf.key_path).expect("cannot open key file");
-	let mut reader = std::io::BufReader::new(keyfile);
-	let keys = rustls::internal::pemfile::pkcs8_private_keys(&mut reader).expect("file contains invalid pkcs8 private key (encrypted keys not supported)");
-
-	config.set_single_cert(certs, keys[0].clone()).unwrap();
-	Arc::new(config)
-}
-
-#[cfg(not(feature="tls"))]
-fn create_config(_conf: TlsConf) -> TlsConfig {
-	()
-}
 
 static mut DB_PATH : String = String::new();
 
 /// Runs both the auth and the verification server.
 fn main() {
-	let mut exe_path = std::env::current_exe().expect("program location unknown");
-	exe_path.pop();
-	exe_path.push("config.toml");
-	let config = std::fs::read_to_string(exe_path).expect("cannot open config file config.toml");
-	let config: Config = toml::from_str(&config).expect("config file parsing error");
-
-	let config1 = create_config(config.tls);
-	let config2 = config1.clone();
+	let config = load_config();
+	let tls_config1 = create_tls_config(config.tls);
+	let tls_config2 = tls_config1.clone();
 
 	unsafe { DB_PATH = config.db.path; }
 
-	thread::spawn(move || { verify::run(unsafe { &DB_PATH }, config1) });
-	auth::run(unsafe { &DB_PATH }, config2);
+	thread::spawn(move || { verify::run(unsafe { &DB_PATH }, tls_config1) });
+	auth::run(unsafe { &DB_PATH }, tls_config2);
 }
